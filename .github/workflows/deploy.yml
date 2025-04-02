@@ -33,6 +33,6 @@ jobs:
           username: "ubuntu"
           key: ${{secrets.KEY}}
           port: 22
-          source: "build/*"
+          source: "./package.json,./package-lock.json,build/*"
           target: "/var/www/crosspace/api"
           strip_components: 1
