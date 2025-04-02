@@ -1,8 +1,5 @@
-if (process.env.NODE_ENV !== "production") {
-  const dotenv = require("dotenv");
-
-  dotenv.config();
-}
+import dotenv from "dotenv";
+dotenv.config();
 
 import { RedisStore } from "connect-redis";
 import cors from "cors";
