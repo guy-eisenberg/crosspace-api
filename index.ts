@@ -153,6 +153,17 @@ io.on("connection", async (socket) => {
     }
   });
 
+  socket.on("file-transfer-start", (data) => {
+    const { targetDevice, transferId } = data as {
+      targetDevice: string;
+      transferId: string;
+    };
+
+    io.to(targetDevice).emit("file-transfer-start", {
+      transferId,
+    });
+  });
+
   socket.on("file-transfer-cancel", (data) => {
     const { targetDevice, transferId } = data as {
       targetDevice: string;
