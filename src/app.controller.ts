@@ -12,7 +12,7 @@ export class AppController {
     @Session() { deviceId }: AppSession,
   ) {
     await this.appService.registerDevice({ userAgent, deviceId });
-    const { stunServers } = await this.appService.getIceServers();
+    const { stunServers } = this.appService.getIceServers();
 
     return { deviceId, stunServers };
   }
