@@ -1,0 +1,53 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: "prod"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "23.x"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Create .env file
+        uses: SpicyPizza/create-envfile@v2.0.3
+        with:
+          directory: "./"
+          envkey_SITE_URL: ${{vars.SITE_URL}}
+          envkey_TWILIO_SID: ${{secrets.TWILIO_SID}}
+          envkey_TWILIO_AUTH_TOKEN: ${{secrets.TWILIO_AUTH_TOKEN}}
+
+      - name: Deploy to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{vars.HOST}}
+          username: "ubuntu"
+          key: ${{secrets.KEY}}
+          port: 22
+          source: "./.env,./package.json,./package-lock.json,build/*"
+          target: "/var/www/crosspace/api"
+          overwrite: true
+          strip_components: 1
+
+      - name: Restart the server
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{vars.HOST}}
+          username: "ubuntu"
+          key: ${{secrets.KEY}}
+          port: 22
+          script: |
+            sudo docker compose -f /var/www/crosspace/docker-compose.yml restart redis
+            sudo docker compose -f /var/www/crosspace/docker-compose.yml restart api
