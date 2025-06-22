@@ -7,7 +7,7 @@ export class JoinSpaceParamDto {
 
 export class JoinSpaceBodyDto {
   @IsString()
-  @Length(9, 9)
+  @Length(32, 32)
   @IsOptional()
-  totp: string | null;
+  token: string | null;
 }

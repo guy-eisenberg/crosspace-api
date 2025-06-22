@@ -26,3 +26,4 @@ export const TOTP_CONFIG = {
 };
 
 export const OTP_TTL = 60;
+export const TOKEN_TTL = 60 * 60; // 60 minutes

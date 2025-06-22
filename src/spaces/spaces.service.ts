@@ -6,14 +6,13 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { type RedisClientType } from 'redis';
-import { OTP_TTL, TOTP_CONFIG } from 'src/constants';
+import { OTP_TTL, TOKEN_TTL } from 'src/constants';
 import { REDIS_CLIENT } from 'src/redis.module';
 import { R } from 'src/redis/keys';
 import { S3_CLIENT } from 'src/s3.module';
 import { ConnectionEvent, FileMetadata } from 'src/types';
 import { generateOTP } from 'src/utils/generateOTP';
-import { generateTOTPKey } from 'src/utils/generateTOTPKey';
-import { TOTP } from 'totp-generator';
+import { generateToken } from 'src/utils/generateToken';
 import { SpacesGateway } from './spaces.gateway';
 import deleteSpaceDeviceFiles from './utils/deleteSpaceDeviceFiles';
 import getDeviceMetadata from './utils/getDeviceMetadata';
@@ -67,6 +66,29 @@ export class SpacesService {
     return { spaceId };
   }
 
+  async getSpaceToken({
+    deviceId,
+    spaceId,
+  }: {
+    deviceId: string;
+    spaceId: string;
+  }): Promise<{ token: string; ttl: number }> {
+    await this.checkDeviceAuth({ deviceId, spaceId });
+
+    const existingToken = await this.redis.get(R.space(spaceId).token);
+    if (existingToken) {
+      const existingTokenTTL = await this.redis.ttl(R.space(spaceId).token);
+
+      return { token: existingToken, ttl: existingTokenTTL };
+    }
+
+    const token = generateToken();
+
+    await this.redis.setEx(R.space(spaceId).token, TOKEN_TTL, token);
+
+    return { token, ttl: TOKEN_TTL };
+  }
+
   async getSpaceOTP({
     deviceId,
     spaceId,
@@ -89,27 +111,6 @@ export class SpacesService {
     await this.redis.setEx(R.space(spaceId).otp, OTP_TTL, otp);
 
     return { otp, ttl: OTP_TTL };
-  }
-
-  async getSpaceTOTP({
-    deviceId,
-    spaceId,
-  }: {
-    deviceId: string;
-    spaceId: string;
-  }): Promise<{ totp: string; ttl: number }> {
-    await this.checkDeviceAuth({ deviceId, spaceId });
-
-    const totpKey = await this.redis.get(R.space(spaceId).totp_key);
-
-    if (!totpKey)
-      throw new Error(`TOTP key not configured for space of id '${spaceId}'`);
-
-    const { otp: totp, expires } = TOTP.generate(totpKey, TOTP_CONFIG);
-
-    const ttl = Math.ceil((expires - Date.now()) / 1000);
-
-    return { totp, ttl };
   }
 
   async addFilesToSpace({
@@ -309,35 +310,25 @@ export class SpacesService {
   async joinSpace({
     deviceId,
     spaceId,
-    totp,
+    token,
   }: {
     deviceId: string;
     spaceId: string;
-    totp: string | null;
+    token: string | null;
   }) {
     const spacesDevices = await getSpaceDevices(this.redis, { spaceId });
 
     if (!spacesDevices.includes(deviceId)) {
-      const totpKey = await this.redis.get(R.space(spaceId).totp_key);
-
-      if (totpKey) {
-        if (!totp)
+      // Space was initialized, need a token to join:
+      if (spacesDevices.length > 0) {
+        // If no token was provided by the user, throw an error:
+        if (!token)
           throw new HttpException('UNAUTHORIZED', HttpStatus.UNAUTHORIZED);
 
-        const [{ otp: currentTOTP }, { otp: previousTOTP }] = [
-          TOTP.generate(totpKey, TOTP_CONFIG),
-          TOTP.generate(totpKey, {
-            ...TOTP_CONFIG,
-            timestamp: Date.now() - TOTP_CONFIG.period * 1000,
-          }),
-        ];
+        const currentToken = await this.redis.get(R.space(spaceId).token);
 
-        if (totp !== currentTOTP && totp !== previousTOTP)
+        if (!currentToken || token !== currentToken)
           throw new HttpException('UNAUTHORIZED', HttpStatus.UNAUTHORIZED);
-      } else {
-        const newTOTPKey = generateTOTPKey();
-
-        await this.redis.set(R.space(spaceId).totp_key, newTOTPKey);
       }
 
       await this.redis.set(

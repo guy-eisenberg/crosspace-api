@@ -24,6 +24,7 @@ import {
 } from './dtos/DeleteFilesFromSpaceDto';
 import { ExchangeOTPDto } from './dtos/ExchangeOTPDto';
 import { GetSpaceOTPDto } from './dtos/GetSpaceOTPDto';
+import { GetSpaceTokenDto } from './dtos/GetSpaceTokenDto';
 import { JoinSpaceBodyDto, JoinSpaceParamDto } from './dtos/JoinSpaceDto';
 import {
   RequestFilesBodyDto,
@@ -55,12 +56,12 @@ export class SpacesController {
     return this.spacesService.getSpaceOTP({ deviceId, spaceId });
   }
 
-  @Get('/:spaceId/totp')
-  getSpaceTOTP(
+  @Get('/:spaceId/token')
+  getSpaceToken(
     @Session() { deviceId }: AppSession,
-    @Param() { spaceId }: GetSpaceOTPDto,
+    @Param() { spaceId }: GetSpaceTokenDto,
   ) {
-    return this.spacesService.getSpaceTOTP({ deviceId, spaceId });
+    return this.spacesService.getSpaceToken({ deviceId, spaceId });
   }
 
   @Post('/:spaceId/files')
@@ -124,10 +125,9 @@ export class SpacesController {
   joinSpace(
     @Session() { deviceId }: AppSession,
     @Param() { spaceId }: JoinSpaceParamDto,
-    @Body() { totp }: JoinSpaceBodyDto,
+    @Body() { token }: JoinSpaceBodyDto,
   ) {
-    console.log('Join', deviceId, spaceId, totp);
-    return this.spacesService.joinSpace({ deviceId, spaceId, totp });
+    return this.spacesService.joinSpace({ deviceId, spaceId, token });
   }
 
   @Post('/connection/:targetDeviceId')
